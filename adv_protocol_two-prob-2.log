@@ -1,0 +1,5 @@
+{"opcode": 0, "type": "RSA"}
+{"opcode": 1, "type": "RSA", "public": 20173, "parameter": {"n": 176399}}
+{"opcode": 2, "type": "RSA", "encrypted_key": [153840, 154745, 10970, 110855, 140991, 158283, 85600, 142747, 42717, 5192, 145161, 130517, 16874, 145161, 128523, 159169, 2383, 168161, 83071, 42717, 28815, 142747, 128523, 108493, 159169, 108493, 124357, 144386, 52358, 108493, 69791, 153840]}
+{"opcode": 2, "type": "AES", "encryption": "gmFpRRpYGMulkJiVuLtqIA=="}
+{"opcode": 2, "type": "AES", "encryption": "9lFYat67/6L6FZP9nCsCzw=="}
