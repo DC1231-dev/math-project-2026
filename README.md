@@ -1,100 +1,110 @@
 # Project 1: Alice / Bob 암호화 통신
 
-Protocol I~IV와 RSA·DH 로그 복호화 도구를 구현했다. Python 3.10 이상을 사용한다.
+EL2001 Mathematical Foundation of Computer Science, Project 1-1.
+Protocol I~IV(RSA 키 생성, RSA 키 전달, DH 키 교환, DH 오류 처리)와 추가 과제(RSA·DH 도청 공격)를 구현했다. Python 3.10 이상을 사용한다.
 
-## 설치와 실행
+## 팀 구성과 역할
 
-이 문서와 `alice.py`, `bob.py`가 있는 `Project1_Submission` 폴더에서 실행한다.
+| 이름 | 담당 |
+|---|---|
+| 유희선 | 초기 구현 전체: `crypto_math.py`, `wire.py`, `alice.py`, `bob.py`, `attacker.py`, `test_project.py`, 문서 초안 |
+| 신동찬 | 검토 및 수정: 강의자료·교수님 예제·공지와의 호환성 대조, AES 패딩 호환성 수정과 테스트 추가, 문서 정리, 테스트 서버 통신 확인 |
+| 공동 | 두 컴퓨터 간 통신 시연, 인터뷰 준비 |
+
+## 설치
+
+이 문서와 `alice.py`, `bob.py`가 있는 폴더에서 실행한다.
 
 ```bash
 python3 -m pip install -r requirements.txt
 python3 -c "from Crypto.Cipher import AES; print('AES OK')"
 ```
 
-설치 패키지는 `pycryptodome`, 코드에서 사용하는 모듈 이름은 `Crypto`다. 소문자 `crypto` 또는 `AES`라는 별도 패키지를 설치하는 것으로 대체할 수 없다. 설치 기록은 있지만 import가 실패하면 동일 환경에 설치된 `crypto`와의 충돌을 확인한다.
+설치 패키지는 `pycryptodome`이고 코드의 모듈 이름은 `Crypto`다. 강의자료의 `pycrypto`와 같은 `Crypto` 인터페이스를 쓴다.
 
-### Bob 실행 (첫 번째 터미널)
+## 교수님 테스트 서버 접속 (Alice 역할)
+
+1. 웹브라우저로 `vpn.kentech.ac.kr`에 접속하여 KENTECH 계정으로 로그인한다.
+2. 프로토콜에 맞는 포트로 Alice를 실행한다.
 
 ```bash
-python3 bob.py --port 6666 --message "Hello from Bob"
+python3 alice.py --addr 10.41.12.51 --port 5551 --protocol RSAKey                   # Protocol I
+python3 alice.py --addr 10.41.12.51 --port 5552 --protocol RSA --message "world"    # Protocol II
+python3 alice.py --addr 10.41.12.51 --port 5553 --protocol DH  --message "world"    # Protocol III
+python3 alice.py --addr 10.41.12.51 --port 5554 --protocol DH  --message "world"    # Protocol IV
 ```
 
-Bob은 계속 접속을 받는다. 중지하려면 Ctrl+C를 누른다. 기본 바인딩은 `0.0.0.0`이고, 자신의 컴퓨터에서만 실습하려면 `--addr 127.0.0.1`을 추가한다.
+- `--protocol`은 포트와 맞춰 직접 지정한다. Protocol IV도 `DH`다.
+- RSA·DH에는 `--message`가 필요하다. 평문은 UTF-8 기준 최대 16바이트이며 한글은 보통 한 글자에 3바이트다.
+- 교수님 Bob은 Protocol II·III에서 `hello`를 AES로 암호화해 먼저 보낸다. 정상이면 `Decrypted: hello`가 출력된다.
+- Protocol IV에서는 `incorrect prime number` 또는 `incorrect generator`를 보내고 종료한다. 이때 종료 코드 1은 정상 동작이다.
+- 응답이 없으면 VPN·방화벽 문제일 수 있다.
 
-### Alice 실행 (두 번째 터미널)
-
-각 명령은 별도의 연결로 실행된다. Bob을 먼저 실행한다.
+## 우리 Bob 실행 (서버 역할)
 
 ```bash
-# I: RSA 키 쌍 생성 및 검증
+python3 bob.py --port 6666 --message "hello"
 python3 alice.py --addr 127.0.0.1 --port 6666 --protocol RSAKey
-
-# II: RSA로 AES 키 전달 후 양방향 메시지 교환
-python3 alice.py --addr 127.0.0.1 --port 6666 --protocol RSA --message "Hello Alice"
-
-# III: DH로 AES 키 합의 후 양방향 메시지 교환
-python3 alice.py --addr 127.0.0.1 --port 6666 --protocol DH --message "안녕하세요"
+python3 alice.py --addr 127.0.0.1 --port 6666 --protocol RSA --message "world"
+python3 alice.py --addr 127.0.0.1 --port 6666 --protocol DH  --message "world"
 ```
 
-다른 컴퓨터에 연결할 때는 `127.0.0.1` 대신 Bob 컴퓨터의 IP를 입력하고 해당 포트의 접속을 허용한다. `--message`는 키가 아니라 암호화할 평문이다. UTF-8 기준 최대 16바이트이며, 한글은 보통 한 글자당 3바이트다. 빈 문자열도 `--message ""`로 입력할 수 있다.
-
-각 프로그램은 보내고 받은 JSON과 `Decrypted:` 결과를 출력한다. RSAKey 결과는 `correct=True`로 검증 성공을 표시한다. Alice의 오류는 종료 코드 1, 잘못된 명령행은 종료 코드 2로 표시한다.
-
-### IV: 오류 처리 시연
-
-기존 Bob을 중지한 뒤 아래 명령 중 하나로 다시 실행하고 Alice의 DH 명령을 실행한다.
+- Bob은 기본으로 `0.0.0.0`에 바인딩하고 계속 접속을 받는다. Ctrl+C로 중지한다.
+- 다른 컴퓨터에서 접속할 때는 Bob 컴퓨터의 IP(`ifconfig` / `ipconfig`)를 사용하고 방화벽에서 포트를 허용한다.
+- Protocol IV 시연은 Bob을 다음 옵션으로 다시 실행한다.
 
 ```bash
-python3 bob.py --port 6666 --message "Bob" --dh-error prime
-python3 bob.py --port 6666 --message "Bob" --dh-error generator
+python3 bob.py --port 6666 --message "hello" --dh-error prime       # p=403(=13×31) 전송
+python3 bob.py --port 6666 --message "hello" --dh-error generator   # 정상 소수와 g=1 전송
 ```
-
-- `prime`: Bob이 `p=403`을 전송. Alice가 `opcode=3`, `incorrect prime number`를 전송하고 종료.
-- `generator`: Bob이 정상 소수와 `g=1`을 전송. Alice가 `opcode=3`, `incorrect generator`를 전송하고 종료.
-- Bob은 받은 오류를 출력하고 해당 연결을 닫는다. 이후 접속도 계속 받지만 오류 시연 옵션은 재시작할 때까지 유지된다.
-- 정상 모드는 `--dh-error none`이며 기본값이다.
 
 ## 파일별 기능
 
 | 파일 | 기능 |
 |---|---|
-| `alice.py` | 요청, RSA 키 검증, DH 파라미터 검증, 키 합의 및 AES 교환 |
-| `bob.py` | 요청별 서버 처리, 키 생성, 오류 시연, AES 교환 |
-| `crypto_math.py` | 소수·생성원·역원·RSA·DH 연산과 AES/Base64/패딩 |
-| `wire.py` | 분할 수신과 연속 JSON을 처리하는 공통 통신 모듈 |
-| `attacker.py` | 제공 로그의 RSA 소인수분해 또는 DH 지수 탐색 |
-| `test_project.py` | 수학, 경계값, 오류, 독립 상대, 로컬 TCP, 공격 로그 검증 |
+| `crypto_math.py` | 소수 판별, 최대공약수·확장 유클리드·모듈러 역원, 생성원 판별, RSA·DH 연산, AES/Base64/패딩 |
+| `wire.py` | TCP 스트림에서 JSON 객체를 하나씩 송수신하는 공통 통신 모듈 |
+| `alice.py` | 클라이언트: 요청, RSA 키 검증, DH 파라미터 검증, 키 합의, AES 메시지 교환 |
+| `bob.py` | 서버: 요청별 키 생성, DH 오류 시연, AES 메시지 교환 |
+| `attacker.py` | 제공 로그에서 RSA 소인수분해 또는 DH 지수 전수 탐색으로 평문 복원 |
+| `test_project.py` | 수학, 경계값, 오류, 독립 상대, 로컬 TCP, 공격 로그 자동 검증 |
 
-RSA·DH 수학 함수는 직접 구현했고 모듈러 거듭제곱은 Python의 `pow`를 사용한다. AES와 PKCS#7 패딩은 PyCryptodome을 사용한다. 수신 시 PKCS#7 패딩이 맞지 않으면 교수님 예제 방식의 패딩 없는 평문으로 보고 그대로 사용한다.
+RSA·DH 수학 함수는 직접 구현했고 모듈러 거듭제곱은 Python의 `pow`를 사용한다. AES와 PKCS#7 패딩은 PyCryptodome을 사용한다.
+
+## 프로토콜 요약
+
+| 프로토콜 | 메시지 흐름 | 핵심 계산 |
+|---|---|---|
+| I (RSAKey) | A→B `opcode 0` 요청 / B→A `opcode 0`, `public=e`, `private=d`, `parameter={p,q}` | Alice가 p·q 소수 여부(400~500), `gcd(e,φ)=1`, `e·d mod φ = 1` 검증 후 `correct=True/False` 출력 |
+| II (RSA) | 요청 / B→A `opcode 1`, `public=e`, `parameter={n}` / A→B `opcode 2`, `encrypted_key=[정수 32개]` / B→A AES / A→B AES | 32바이트 세션키를 한 바이트씩 `c = k^e mod n`, Bob은 `k = c^d mod n` |
+| III (DH) | 요청 / B→A `opcode 1`, `public=B`, `parameter={p,g}` / A→B `opcode 1`, `public=A` / B→A AES / A→B AES | 공유 비밀 `B^a = A^b = g^(ab) mod p`, AES 키 `shared.to_bytes(2,'big') * 16` |
+| IV (DH 오류) | B→A에 비소수 p 또는 비생성원 g / A→B `opcode 3`, `error` 후 종료 | 소수 검사를 먼저 하고, `p-1`의 모든 소인수 r에 대해 `g^((p-1)/r) ≠ 1 (mod p)`로 생성원 판별 |
+
+AES 메시지는 `opcode 2`, `type AES`, `encryption=Base64 문자열`이다. 키가 준비된 뒤의 AES 교환 코드는 Protocol II·III가 공통으로 사용한다(`alice.py` `exchange()` 마지막 부분, `bob.py` `exchange()` 마지막 부분).
 
 ## 통신 규격과 호환성
 
-- 최초 요청은 `opcode=0`, `type=RSAKey|RSA|DH`다.
-- Protocol I 응답은 슬라이드 3에 따라 **opcode 0**이다. `public=e`, `private=d`, `parameter={p,q}`를 보낸다. 이는 키 검증 실습용 프로토콜이다.
-- Protocol II 공개키 응답은 `opcode=1`, `type=RSA`, `public=e`, `parameter={n}`이다. 키 전송은 `opcode=2`, `type=RSA`, `encrypted_key=[정수 32개]`다.
-- DH 응답은 `opcode=1`, `type=DH`, `public=정수`, Bob의 응답에만 `parameter={p,g}`가 있다.
-- AES 메시지는 `opcode=2`, `type=AES`, `encryption=Base64 문자열`이다.
-- DH 키는 `shared.to_bytes(2, byteorder="big") * 16`으로 32바이트를 만든다.
-- JSON 객체를 별도 헤더나 필수 줄바꿈 없이 전송한다. 수신 파서가 객체 경계를 구분하고 나머지 데이터를 보존한다. ASCII 이스케이프 송신, UTF-8 수신을 지원한다.
-- 메시지는 64KiB 이하, 객체 하나를 기다리는 시간은 최대 10초다. 잘못된 입력·연결 종료 시 현재 연결을 닫는다.
-- AES는 과제의 ECB 256-bit 조건을 따른다. UTF-8 바이트에 PKCS#7 패딩을 적용하므로 정확히 16바이트인 입력은 암호문이 32바이트가 된다.
+- 공개키는 제공 로그와 같이 정수로 주고받는다. Protocol IV 그림의 Base64 공개키 표기는 교수님 공지에서 "하지 않아도 된다"고 정정되었다.
+- Protocol I 응답 opcode는 슬라이드 3에 따라 0으로 구현했다. 메시지 표의 일반 규칙(키 메시지는 1)과 다르므로 테스트 서버로 확인한다.
+- JSON 객체를 별도 헤더나 줄바꿈 없이 전송한다. 수신 측은 객체 경계를 직접 구분하고 남은 데이터를 다음 수신에 사용한다. 송신은 ASCII 이스케이프 JSON이다.
+- 메시지는 64KiB 이하, 객체 하나의 수신 대기는 최대 10초다. 잘못된 입력이나 연결 종료 시 해당 연결을 닫는다.
+- AES는 ECB 256-bit다. 송신 시 UTF-8 바이트에 PKCS#7 패딩을 적용하며, 교수님 예제의 복호화 방식으로도 풀린다.
+- 수신 시 PKCS#7 패딩이 맞지 않으면 패딩 없는 평문으로 보고 그대로 사용한다. 교수님 예제(`aes_bob.py`)는 `pad = 16 - len(msg)`이므로 16글자 메시지에 패딩이 붙지 않기 때문이다.
 
-이 제출용 폴더에는 실행 코드·테스트·공격용 원본 로그·설명서만 포함했다. 강의자료, 학습 예제, 개발 캐시, 별도 베이즈 과제는 제외했다.
+이 프로그램은 작은 소수, ECB, 인증되지 않은 DH를 사용하는 수업 실습이며 실제 서비스용 암호 구현이 아니다.
 
-공개키는 제공 로그와 같이 정수로 주고받는다. 교수님 공지에서 Protocol IV의 Base64 공개키 표기는 그림 오류이며 하지 않아도 된다고 정정했다. 받을 때는 예제(`aes_bob.py`) 방식의 패딩 없는 16바이트 평문도 허용한다(`pad = 16 - len(msg)`이므로 16글자 메시지는 패딩이 0개). 보낼 때는 PKCS#7을 사용하며 예제의 복호화 방식으로도 풀린다. 교수님 테스트 서버(10.41.12.51, 포트 5551~5554)와의 통신은 별도로 확인한다.
-
-이 프로그램은 작은 소수, ECB, 인증되지 않은 DH를 사용하는 수업 실습이다. 실제 서비스의 암호화 구현으로 사용하지 않는다.
-
-## 추가 점수: 로그 복호화
+## 추가 과제: 로그 복호화
 
 ```bash
 python3 attacker.py --protocol RSA --logfile adv_protocol_two-prob-1.log
-python3 attacker.py --protocol DH --logfile adv_protocol_three-prob-1.log
+python3 attacker.py --protocol DH  --logfile adv_protocol_three-prob-1.log
 ```
 
-RSA에서는 공개된 n을 소인수분해하고 phi와 개인키 d를 계산하여 AES 키를 복원한다. DH에서는 공개값에 대응하는 지수를 전수 탐색하고 공유 비밀을 복원한다. 결과에는 계산 근거, 복원 키, 로그의 모든 평문이 포함된다. 각 암호문은 복호화 후 재암호화하여 원본과 같은지 확인한다. 입력 로그는 변경하지 않는다.
+- RSA: 공개된 n을 √n 이하의 수로 나누어 p, q를 찾고 φ와 d를 계산해 AES 키를 복원한다.
+- DH: `g^a mod p = A`를 만족하는 a를 1부터 p-1까지 전수 탐색하고 `B^a mod p`로 공유 비밀을 복원한다.
+- 복원한 키로 로그의 모든 AES 메시지를 복호화하고, 다시 암호화해 원본 암호문과 같은지 확인한다. 입력 로그는 변경하지 않는다.
 
-강의자료상 한 공격 성공 시 가산점 1점, 두 공격을 모두 해도 최대 1점이다. 추가 공지의 제출·시연 조건은 별도로 확인한다.
+강의자료상 한 공격 성공 시 가산점 1점, 두 공격 모두 해도 최대 1점이다.
 
 ## 검증
 
@@ -102,35 +112,25 @@ RSA에서는 공개된 n을 소인수분해하고 phi와 개인키 d를 계산�
 python3 -m unittest -v test_project
 ```
 
-테스트는 소수 범위 전체 및 모든 소수 쌍의 RSA 바이트 왕복, 생성원 전수 비교, DH 합의, AES 0·1·15·16바이트와 한글, 17바이트 거부, 잘못된 Base64·길이 거부, 패딩 없는 16바이트(예제 방식) 복호화, JSON 분할·연속 수신, 수신 제한·시간 초과·조기 종료를 확인한다. 독립 상대 코드는 본체의 수학·통신 도우미를 사용하지 않고 Alice/Bob을 각각 검증한다. 제공 로그 12개의 평문도 기대값과 비교한다.
+18개 테스트로 다음을 확인한다: 400~500 소수 전수 판별, 모든 소수 쌍의 RSA 바이트 왕복, 생성원 전수 비교, DH 합의, AES 0·1·15·16바이트와 한글, 17바이트 거부, 잘못된 Base64·길이 거부, 패딩 없는 16바이트(교수님 예제 방식) 복호화, JSON 분할·연속 수신, 수신 제한·시간 초과·조기 종료, 독립 상대 코드와의 통신, 제공 로그 12개의 평문.
 
-두 컴퓨터 간 통신, 교수 평가 프로그램과의 통신은 별도 시연이 필요하다. 자동 테스트 성공이 이 두 항목의 확인을 대신하지 않는다.
+자동 테스트는 교수님 테스트 서버와의 통신이나 두 컴퓨터 간 통신을 대신하지 않는다.
 
-## 역할 분담과 GitHub 기록
+## 평가 전 확인 목록
 
-아래는 제안 역할표이며 실제 이름과 검토 기록을 팀이 채워야 한다. 자동 생성한 코드를 팀원별 실제 기여로 간주하거나 검토 기록을 꾸며 쓰지 않는다.
-
-| 담당 | 이름 | 맡을 부분 | 검토 |
-|---|---|---|---|
-| 팀원 A | 미지정 | 수학·암호 모듈과 로그 공격 원리 이해 및 보완 | 통신 흐름 검토 |
-| 팀원 B | 미지정 | 통신·프로토콜·실행 환경 이해 및 보완 | 수학·공격 결과 검토 |
-| 공동 | 두 사람 | 실제 통신, 평가 프로그램 검증, 인터뷰 | 전체 흐름 설명 |
-
-- [ ] 각자 담당 코드와 수정 사항을 이해하고 역할표에 이름 기입.
-- [ ] GitHub에 실제 변경 단위로 커밋하고 상대방 검토 기록 남기기.
-- [ ] 두 컴퓨터에서 정상·오류 시나리오 실행.
-- [ ] 평가 프로그램과 양쪽 역할로 통신.
-- [ ] 추가 과제 공지와 제출 방식 확인.
-
-이 작업에서는 GitHub에 커밋·푸시·이슈 작성은 하지 않는다. 변경 내용과 검증 결과를 검토한 뒤 팀이 실제 작업 기록으로 관리한다.
+- [ ] VPN 접속 후 테스트 서버 5551~5554에 각각 Alice로 접속해 결과 확인
+- [ ] 두 컴퓨터 사이에서 우리 Bob/Alice 정상·오류 시나리오 실행
+- [ ] GitHub에 작업 단위별 커밋 기록 관리
+- [ ] 두 사람 모두 전체 흐름과 인터뷰 문항 설명 연습
 
 ## 인터뷰 준비
 
-1. **RSA의 d는 어떻게 구하는가?** phi와 e가 서로소이므로 확장 유클리드 알고리즘으로 e의 모듈러 역원을 구한다.
-2. **생성원은 어떻게 확인하는가?** p-1의 각 서로 다른 소인수 r에 대해 g^((p-1)/r) mod p가 1이 아닌지 확인한다.
-3. **DH에서 왜 같은 키인가?** B^a와 A^b가 모두 g^(ab) mod p이기 때문이다. 비밀 지수 자체는 전송하지 않는다.
-4. **RSA와 DH의 역할은?** RSA는 AES 키를 암호화해 전달하고, DH는 양쪽이 같은 AES 키 재료를 계산한다.
-5. **Base64는 암호화인가?** 바이트를 JSON 문자열로 표현하는 인코딩이며 누구나 디코딩할 수 있다.
-6. **왜 입력 길이와 키 길이가 다른가?** AES 키는 32바이트, 블록은 16바이트이고 이 과제 평문 제한은 16바이트다.
-7. **왜 공격이 가능한가?** 과제의 소수 범위가 작아 RSA 소인수분해와 DH 이산 로그 전수 탐색이 빠르게 끝난다.
-8. **JSON 분할 수신을 왜 처리하는가?** TCP는 바이트 스트림이므로 send 한 번과 recv 한 번이 항상 대응하지 않는다.
+1. **RSA의 d는 어떻게 구하는가?** φ와 e가 서로소이므로 확장 유클리드 알고리즘으로 `e·d ≡ 1 (mod φ)`인 d를 구한다.
+2. **생성원은 어떻게 확인하는가?** p-1의 각 서로 다른 소인수 r에 대해 `g^((p-1)/r) mod p`가 1이 아닌지 확인한다. g의 위수는 p-1의 약수이므로, 위수가 p-1보다 작으면 어떤 r에서 반드시 1이 된다.
+3. **왜 소수 검사를 먼저 하는가?** 위 생성원 판별법은 p가 소수일 때만 성립한다.
+4. **DH에서 왜 같은 키가 나오는가?** `B^a = (g^b)^a = g^(ab) = (g^a)^b = A^b`이다. 비밀 지수 a, b는 전송하지 않는다.
+5. **RSA 복호화는 왜 원래 값을 돌려주는가?** `ed = 1 + tφ`이고 오일러 정리 `k^φ ≡ 1 (mod n)`에 의해 `c^d = k^(ed) ≡ k`다. 바이트 값(0~255)이 n보다 작으므로 정확히 복원된다.
+6. **RSA와 DH의 역할 차이는?** RSA는 Alice가 만든 AES 키를 암호화해 전달하고, DH는 양쪽이 각자 같은 키를 계산한다.
+7. **Base64는 암호화인가?** 바이트를 JSON 문자열로 표현하는 인코딩이며 누구나 디코딩할 수 있다.
+8. **왜 공격이 가능한가?** 소수 범위가 400~500으로 작아 n의 소인수분해와 DH 이산 로그 전수 탐색이 즉시 끝난다.
+9. **JSON 분할 수신을 왜 처리하는가?** TCP는 바이트 스트림이므로 send 한 번과 recv 한 번이 항상 대응하지 않는다.
