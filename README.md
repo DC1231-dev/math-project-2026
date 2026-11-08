@@ -104,6 +104,43 @@ python3 attacker.py --protocol DH  --logfile adv_protocol_three-prob-1.log
 - DH: `g^a mod p = A`를 만족하는 a를 1부터 p-1까지 전수 탐색하고 `B^a mod p`로 공유 비밀을 복원한다.
 - 복원한 키로 로그의 모든 AES 메시지를 복호화하고, 다시 암호화해 원본 암호문과 같은지 확인한다. 입력 로그는 변경하지 않는다.
 
+### 시연 방법: 저장된 로그에서 메시지 출력
+
+`attacker.py`는 이미 저장된 통신 기록을 읽어 복호화하는 프로그램이다. 공격 시연에는 Bob이나 Alice를 함께 실행하거나 별도 포트를 열 필요가 없다.
+
+1. 분석할 로그 파일을 이 폴더에 복사한다. 기존 예제 로그를 덮어쓰지 않고 새 이름으로 보관해도 된다.
+2. RSA 통신 로그라면 `--protocol RSA`, DH 통신 로그라면 `--protocol DH`를 지정한다.
+3. `--logfile` 뒤에 실제 파일 이름이나 경로를 넣어 실행한다.
+
+```bash
+# 아래 파일명은 예시다. 실제로 받은 로그 파일명으로 바꾼다.
+python3 attacker.py --protocol RSA --logfile rsa_session.log
+python3 attacker.py --protocol DH --logfile dh_session.log
+```
+
+화면에 출력되는 JSON의 `plaintexts`가 복원한 메시지 목록이다. `evidence`는 키 복원에 사용한 계산 결과, `aes_key_hex`는 복원한 AES 키다. 입력 로그는 읽기만 하며 수정하지 않는다. 코드를 고칠 필요 없이 프로토콜과 파일 경로만 바꾸면 된다.
+
+로그는 **한 줄에 JSON 객체 하나**인 형식이어야 한다. 같은 통신 한 회의 공개키·키 교환 메시지와 AES 암호문을 함께 포함해야 한다. 터미널 화면 전체나 `INFO Sent:` 같은 접두사가 붙은 출력은 그대로 입력할 수 없다.
+
+우리 Bob과 친구 Alice의 통신으로 새 로그를 만들려면 먼저 Bob 출력을 저장한다. 친구 Alice는 Bob 컴퓨터의 IP와 6666번 포트로 직접 접속한다.
+
+```bash
+# 터미널 1: Bob 실행과 동시에 화면 출력을 저장한다.
+# 새 시연마다 새 파일명을 쓰면 이전 기록을 보존할 수 있다.
+python3 bob.py --port 6666 --message "hello" 2>&1 | tee rsa_capture.txt
+```
+
+Alice와 메시지 교환 한 회를 마친 뒤 Bob을 Ctrl+C로 종료하고, 다음 명령으로 송수신 JSON만 추출한다. 아래 추출 명령은 macOS 터미널 기준이다.
+
+```bash
+sed -nE "s/^INFO (Sent|Received): //p" rsa_capture.txt > rsa_session.log
+python3 attacker.py --protocol RSA --logfile rsa_session.log
+```
+
+DH도 같은 방법으로 기록하고 `--protocol DH`로 분석한다. **캡처 파일 하나에는 통신 한 회만 담는다.** 현재 공격 도구는 여러 통신을 한 파일에서 세션별로 나누지 않는다. 캡처를 시작하기 전에 있었던 통신은 새 파일에 포함되지 않는다.
+
+교수님이 분석용 로그를 제공하면 해당 파일을 지정해 실행하면 된다. 다만 강의자료만으로는 평가 당일 로그 제공 방식이나 실시간 수집 요구 여부가 확정되지 않았으므로 실제 시연 방식은 최종 공지에 맞춘다.
+
 강의자료상 한 공격 성공 시 가산점 1점, 두 공격 모두 해도 최대 1점이다.
 
 ## 검증
