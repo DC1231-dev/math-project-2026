@@ -7,7 +7,7 @@ Protocol I~IV(RSA 키 생성, RSA 키 전달, DH 키 교환, DH 오류 처리)�
 
 | 이름 | 담당 |
 |---|---|
-| 유희선 | 초기 구현 전체: `crypto_math.py`, `wire.py`, `alice.py`, `bob.py`, `attacker.py`, `test_project.py`, 문서 초안 |
+| 유희선 | 초기 구현 전체: `crypto_math.py`, `wire.py`, `alice.py`, `bob.py`, `attacker.py`, `test_project.py`, 문서 초안, 주석 추가 |
 | 신동찬 | 검토 및 수정: 강의자료·교수님 예제·공지와의 호환성 대조, AES 패딩 호환성 수정과 테스트 추가, 문서 정리, 테스트 서버 통신 확인 |
 | 공동 | 두 컴퓨터 간 통신 시연, 인터뷰 준비 |
 
