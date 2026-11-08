@@ -103,6 +103,12 @@ class AESTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 cm.encrypt_message(key, text)
 
+    def test_invalid_base64_length(self):
+        key = bytes(32)
+        for text in ['!!', '', base64.b64encode(b'x').decode()]:
+            with self.assertRaises(ValueError):
+                cm.decrypt_message(key, text)
+
     def test_professor_style_unpadded_16_chars(self):
         # aes_bob.py 방식: pad = 16 - len(msg) 이므로 16글자면 패딩 없음
         key = bytes(32)
